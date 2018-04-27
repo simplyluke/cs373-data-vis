@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <!--
-CREDIT FOR MUCH OF THE CODE AND STATE DATA TO @devsar and @mbostock on github.
+CREDIT FOR MUCH OF THE CODE/INSPIRATION AND STATE DATA TO @devsar and @mbostock on github.
 Inspired by this example found on the D3 Project's example gallery
 https://mbostock.github.io/d3/talk/20111116/airports.html
+
+Updated to include modern features like zooming, scaling
 -->
 <html>
   <head>
     <script type="text/javascript" src="d3.js"></script>
-    <script type="text/javascript" src="d3.csv.js"></script>
     <script type="text/javascript" src="d3.geo.js"></script>
     <script type="text/javascript" src="d3.geom.js"></script>
+    <script type="text/javascript" src="d3.tip.js"></script>
     <link type="text/css" rel="stylesheet" href="style.css"/>
+    <link rel="stylesheet" href="//rawgithub.com/Caged/d3-tip/master/examples/example-styles.css">
     <style type="text/css">
 #states path {
   fill: #ccc;
@@ -42,10 +45,10 @@ circle {
   <body>
     <div id="body">
       <div id="footer">
-        <span>U.S. Commercial Flights</span>, 2008
+        <!-- <span>U.S. Commercial Flights</span>, 2008
         <div class="hint">
           mouseover for flights from each airport
-        </div>
+        </div> -->
         <!-- <div style="font-size:12px;line-height:60px;"><input type="checkbox" id="voronoi"> <label for="voronoi">show Voronoi</label></div> -->
       </div>
     </div>
@@ -61,13 +64,23 @@ var path = d3.geo.path()
     .projection(projection);
 var svg = d3.select("#body").append("svg:svg")
     .attr("width", w)
-    .attr("height", h);
+    .attr("height", h)
+    .call(d3.behavior.zoom()
+    .on("zoom", zoomed));
 var states = svg.append("svg:g")
     .attr("id", "states");
 var circles = svg.append("svg:g")
     .attr("id", "circles");
 var cells = svg.append("svg:g")
     .attr("id", "cells");
+
+function zoomed() {
+  svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+  circles.selectAll("circle")
+      .attr("cx", function(d) { return projection([+d.latitude, +d.longitude])[0]; })
+      .attr("cy", function(d) { return projection([+d.latitude, +d.longitude])[1]; })
+      .attr("r", function(d) {return (d3.event.scale < 9 ? 10 - d3.event.scale : 1);});
+}
 // d3.select("input[type=checkbox]").on("change", function() {
 //   cells.classed("voronoi", this.checked);
 // });
@@ -82,7 +95,6 @@ d3.json("parks.json", function(parks) {
   parks.forEach(function(park) {
     var location = [+park.latitude, +park.longitude];
     positions.push(projection(location));
-    console.log("adding location");
   });
   var g = cells.selectAll("g")
     .data(parks)
@@ -94,63 +106,17 @@ d3.json("parks.json", function(parks) {
       .attr("class", "cell")
       // .attr("d", function(d, i) { return "M" + polygons[i].join("L") + "Z"; })
       .on("mouseover", function(d, i) { d3.select("#footer span").text(d.name); });
+  var tip = d3.tip().attr('class', 'd3-tip').html(function(d) {return d.name;});
+  circles.call(tip);
   circles.selectAll("circle")
       .data(parks)
     .enter().append("svg:circle")
-      .attr("cx", function(d, i) { return positions[i][0]; })
-      .attr("cy", function(d, i) { return positions[i][1]; })
-      .attr("r", function(d, i) { return 10.0; });
+      .attr("cx", function(d) { return projection([+d.latitude, +d.longitude])[0]; })
+      .attr("cy", function(d) { return projection([+d.latitude, +d.longitude])[1]; })
+      .attr("r", function(d) {return 10; })
+      .on('mouseover', tip.show)
+      .on('mouseout', tip.hide);
 });
-// d3.csv("flights-airport.csv", function(flights) {
-//   var linksByOrigin = {},
-//       countByAirport = {},
-//       locationByAirport = {},
-//       positions = [];
-//   // var arc = d3.geo.greatArc()
-//   //     .source(function(d) { return locationByAirport[d.source]; })
-//   //     .target(function(d) { return locationByAirport[d.target]; });
-//   flights.forEach(function(flight) {
-//     var origin = flight.origin,
-//         destination = flight.destination,
-//         links = linksByOrigin[origin] || (linksByOrigin[origin] = []);
-//     links.push({source: origin, target: destination});
-//     // countByAirport[origin] = (countByAirport[origin] || 0) + 1;
-//     countByAirport[destination] = (countByAirport[destination] || 0) + 1;
-//   });
-//   d3.csv("airports.csv", function(airports) {
-//     // Only consider airports with at least one flight.
-//     airports = airports.filter(function(airport) {
-//       if (countByAirport[airport.iata]) {
-//         var location = [+airport.longitude, +airport.latitude];
-//         // locationByAirport[airport.iata] = location;
-//         positions.push(projection(location));
-//         return true;
-//       }
-//     });
-//     console.log(airports);
-//     // Compute the Voronoi diagram of airports' projected positions.
-//     // var polygons = d3.geom.voronoi(positions);
-//     var g = cells.selectAll("g")
-//         .data(airports)
-//       .enter().append("svg:g");
-//     // g.append("svg:path")
-//     //     .attr("class", "cell")
-//     //     .attr("d", function(d, i) { return "M" + polygons[i].join("L") + "Z"; })
-//     //     .on("mouseover", function(d, i) { d3.select("#footer span").text(d.name); });
-//     // g.selectAll("path.arc")
-//     //     .data(function(d) { return linksByOrigin[d.iata] || []; })
-//     //   .enter().append("svg:path")
-//     //     .attr("class", "arc")
-//     //     .attr("d", function(d) { return path(arc(d)); });
-//     circles.selectAll("circle")
-//         .data(airports)
-//       .enter().append("svg:circle")
-//         .attr("cx", function(d, i) { return positions[i][0]; })
-//         .attr("cy", function(d, i) { return positions[i][1]; })
-//         .attr("r", function(d, i) { return 10; });
-//         // .sort(function(a, b) { return countByAirport[b.iata] - countByAirport[a.iata]; });
-//   });
-// });
     </script>
   </body>
 </html>
